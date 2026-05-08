@@ -18,20 +18,46 @@ if errorlevel 1 (
     exit /b 1
 )
 
-conda run -n %ENV_NAME% python --version >nul 2>nul
-if errorlevel 1 (
-    echo Creating conda environment: %ENV_NAME%
-    conda create -y -n %ENV_NAME% python=3.11
+if /I "%CONDA_DEFAULT_ENV%"=="%ENV_NAME%" (
+    echo Conda environment %ENV_NAME% is already active.
+) else (
+    echo Checking conda environment: %ENV_NAME%
+    conda env list | findstr /R /C:"^%ENV_NAME% " >nul 2>nul
     if errorlevel 1 (
-        echo Failed to create conda environment %ENV_NAME%.
+        echo Creating conda environment: %ENV_NAME%
+        conda create -y -n %ENV_NAME% python=3.11
+        if errorlevel 1 (
+            echo Failed to create conda environment %ENV_NAME%.
+            echo.
+            pause
+            exit /b 1
+        )
+    )
+
+    echo Activating conda environment: %ENV_NAME%
+    call conda activate %ENV_NAME%
+    if errorlevel 1 (
+        echo Failed to activate conda environment %ENV_NAME%.
+        echo If you installed Conda recently, reopen Anaconda Prompt or Command Prompt and try again.
         echo.
         pause
         exit /b 1
     )
 )
 
-echo Using conda environment: %ENV_NAME%
-conda run -n %ENV_NAME% python -m pip install --upgrade pip
+python --version
+if errorlevel 1 (
+    echo Python is not available in conda environment %ENV_NAME%.
+    echo Recreating the environment may fix this:
+    echo   conda remove -n %ENV_NAME% --all
+    echo   conda create -y -n %ENV_NAME% python=3.11
+    echo.
+    pause
+    exit /b 1
+)
+
+echo Installing dependencies in conda environment: %ENV_NAME%
+python -m pip install --upgrade pip
 if errorlevel 1 (
     echo Failed to upgrade pip.
     echo.
@@ -39,7 +65,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-conda run -n %ENV_NAME% python -m pip install -r requirements.txt
+python -m pip install -r requirements.txt
 if errorlevel 1 (
     echo Failed to install project dependencies.
     echo.
@@ -49,7 +75,7 @@ if errorlevel 1 (
 
 echo.
 echo Starting application...
-conda run -n %ENV_NAME% python app.py
+python app.py
 if errorlevel 1 (
     echo.
     echo Application exited with an error.
