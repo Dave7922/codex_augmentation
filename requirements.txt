@@ -1,0 +1,6 @@
+numpy
+opencv-python
+Pillow
+# Optional, for SAM:
+# torch
+# segment-anything

@@ -1,0 +1,22 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+env/
+
+# Local model weights and checkpoints are too large for regular GitHub pushes.
+checkpoints/
+*.pth
+*.pt
+*.onnx
+
+# Downloaded source archives; keep extracted source files instead.
+*.zip
+
+# Generated synthesis/export output.
+output/
+exports/
+export_coco/
+exprot_coco/
