@@ -18,6 +18,10 @@ from core.sam_engine import SamEngine
 
 
 class AugApp:
+    MODE_SAM = "SAM 点提示"
+    MODE_POLYGON = "折线多边形"
+    MODE_HYBRID = "SAM+折线约束"
+
     def __init__(self, root: Tk) -> None:
         self.root = root
         self.root.title("PCB 缺陷增强 - SAM + 高级融合")
@@ -47,11 +51,14 @@ class AugApp:
 
         self.points = []
         self.labels = []
+        self.polygon_points = []
+        self.polygon_closed = False
         self.paste_center = None
         self.last_target_dir = None
 
         self.class_name = StringVar(value="缺陷")
         self.blend_mode = StringVar(value="poisson-mixed")
+        self.segment_mode_var = StringVar(value=self.MODE_SAM)
         self.scale_var = DoubleVar(value=1.0)
         self.rotation_var = DoubleVar(value=0.0)
         self.flip_x_var = BooleanVar(value=False)
@@ -61,6 +68,7 @@ class AugApp:
         self.batch_count_var = IntVar(value=20)
         self.src_zoom_var = DoubleVar(value=1.0)
         self.tgt_zoom_var = DoubleVar(value=1.0)
+        self.source_hint = StringVar(value="")
         self.status = StringVar(value="就绪")
 
         self._build_ui()
@@ -87,6 +95,9 @@ class AugApp:
         Button(source_ops, text="分割", command=self.run_segment).pack(side=LEFT, padx=3)
         Button(source_ops, text="撤销点", command=self.undo_last_point).pack(side=LEFT, padx=3)
         Button(source_ops, text="清空点", command=self.clear_points).pack(side=LEFT, padx=3)
+        Button(source_ops, text="闭合折线", command=self.close_polygon).pack(side=LEFT, padx=3)
+        Button(source_ops, text="撤销折线点", command=self.undo_polygon_point).pack(side=LEFT, padx=3)
+        Button(source_ops, text="清空折线", command=self.clear_polygon).pack(side=LEFT, padx=3)
         Button(source_ops, text="精修掩码", command=self.run_refine).pack(side=LEFT, padx=3)
         Button(source_ops, text="提取贴片", command=self.run_extract_patch).pack(side=LEFT, padx=3)
 
@@ -100,6 +111,17 @@ class AugApp:
 
         settings = ttk.LabelFrame(self.root, text="参数设置", padding=(10, 8))
         settings.pack(side=TOP, fill="x", padx=10, pady=(0, 8))
+
+        ttk.Label(settings, text="分割模式").pack(side=LEFT, padx=(0, 4))
+        seg_mode = ttk.Combobox(
+            settings,
+            textvariable=self.segment_mode_var,
+            values=[self.MODE_SAM, self.MODE_POLYGON, self.MODE_HYBRID],
+            width=14,
+            state="readonly",
+        )
+        seg_mode.pack(side=LEFT, padx=(0, 10))
+        seg_mode.bind("<<ComboboxSelected>>", self.on_segment_mode_changed)
 
         ttk.Label(settings, text="融合").pack(side=LEFT, padx=(0, 4))
         ttk.Combobox(settings, textvariable=self.blend_mode, values=["alpha", "poisson-normal", "poisson-mixed"], width=16, state="readonly").pack(side=LEFT, padx=(0, 10))
@@ -126,12 +148,14 @@ class AugApp:
 
         left_panel = ttk.LabelFrame(middle, text="源图视图", padding=(6, 6))
         left_panel.pack(side=LEFT, fill=BOTH, expand=True, padx=8, pady=6)
-        Label(left_panel, text="左键=前景点 | Shift+左键=背景点 | 右键=删除最近点 | Ctrl+拖拽=平移").pack(anchor="w", pady=(0, 4))
+        Label(left_panel, textvariable=self.source_hint).pack(anchor="w", pady=(0, 4))
         self.source_canvas = Canvas(left_panel, bg="#202020", width=700, height=740)
         self.source_canvas.pack(fill=BOTH, expand=True)
         self.source_canvas.bind("<Button-1>", self.on_source_click_fg)
         self.source_canvas.bind("<Shift-Button-1>", self.on_source_click_bg)
+        self.source_canvas.bind("<Alt-Button-1>", self.on_source_click_poly)
         self.source_canvas.bind("<Button-3>", self.on_source_right_click)
+        self.source_canvas.bind("<Shift-Button-3>", self.on_source_right_click_poly)
         self.source_canvas.bind("<Control-ButtonPress-1>", self.on_source_pan_start)
         self.source_canvas.bind("<Control-B1-Motion>", self.on_source_pan_move)
         self.source_canvas.bind("<Control-ButtonRelease-1>", self.on_source_pan_end)
@@ -148,6 +172,21 @@ class AugApp:
 
         bar = ttk.Label(self.root, textvariable=self.status, anchor="w", relief="sunken", padding=(8, 4))
         bar.pack(fill="x", padx=10, pady=(0, 8))
+        self.root.bind("<Return>", self.on_finish_polygon_shortcut)
+        self._update_source_hint()
+
+    def on_segment_mode_changed(self, _event=None) -> None:
+        self._update_source_hint()
+        self.status.set(f"分割模式已切换为：{self.segment_mode_var.get()}")
+
+    def _update_source_hint(self) -> None:
+        mode = self.segment_mode_var.get()
+        if mode == self.MODE_POLYGON:
+            self.source_hint.set("左键=添加折线点 | 右键=撤销折线点 | Enter/按钮=闭合折线 | Ctrl+拖拽=平移")
+        elif mode == self.MODE_HYBRID:
+            self.source_hint.set("左键=前景点 | Shift+左键=背景点 | Alt+左键=折线点 | Shift+右键=撤销折线点 | Ctrl+拖拽=平移")
+        else:
+            self.source_hint.set("左键=前景点 | Shift+左键=背景点 | 右键=删除最近点 | Ctrl+拖拽=平移")
 
     def _auto_load_default_sam(self) -> None:
         # Prefer the smaller ViT-B checkpoint for faster startup/inference.
@@ -208,6 +247,22 @@ class AugApp:
             color = "#00ff00" if lb == 1 else "#ff4040"
             self.source_canvas.create_oval(dx - 4, dy - 4, dx + 4, dy + 4, fill=color, outline="")
 
+        if self.polygon_points:
+            disp_points = [
+                (int(px * self.src_scale) + self.src_offset_x, int(py * self.src_scale) + self.src_offset_y)
+                for px, py in self.polygon_points
+            ]
+            for px, py in disp_points:
+                self.source_canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#ffb000", outline="")
+            for i in range(1, len(disp_points)):
+                x1, y1 = disp_points[i - 1]
+                x2, y2 = disp_points[i]
+                self.source_canvas.create_line(x1, y1, x2, y2, fill="#ffb000", width=2)
+            if self.polygon_closed and len(disp_points) >= 3:
+                x1, y1 = disp_points[-1]
+                x2, y2 = disp_points[0]
+                self.source_canvas.create_line(x1, y1, x2, y2, fill="#ffb000", width=2)
+
     def _draw_target(self) -> None:
         img = self.result_bgr if self.result_bgr is not None else self.target_bgr
         if img is None:
@@ -244,6 +299,8 @@ class AugApp:
         self.sam.set_image(img)
         self.source_mask = None
         self.points, self.labels = [], []
+        self.polygon_points = []
+        self.polygon_closed = False
         self.src_offset_x = 0
         self.src_offset_y = 0
         self.status.set(f"已加载源图：{Path(path).name}")
@@ -256,11 +313,13 @@ class AugApp:
         self.source_mask = None
         self.points = []
         self.labels = []
+        self.polygon_points = []
+        self.polygon_closed = False
         self.patch_bgr = None
         self.patch_mask = None
         self.src_offset_x = 0
         self.src_offset_y = 0
-        self.status.set("源图已重置：提示点、掩码和贴片已清空")
+        self.status.set("源图已重置：提示点、折线、掩码和贴片已清空")
         self._draw_source()
 
     def load_sam_checkpoint(self) -> None:
@@ -282,6 +341,16 @@ class AugApp:
             messagebox.showerror("SAM 错误", str(exc))
 
     def run_segment(self) -> None:
+        mode = self.segment_mode_var.get()
+        if mode == self.MODE_POLYGON:
+            self._run_segment_polygon()
+            return
+        if mode == self.MODE_HYBRID:
+            self._run_segment_hybrid()
+            return
+        self._run_segment_sam()
+
+    def _run_segment_sam(self) -> None:
         if self.source_bgr is None:
             messagebox.showwarning("提示", "请先加载源图")
             return
@@ -302,6 +371,57 @@ class AugApp:
             self._draw_source()
         except Exception as exc:
             self.status.set(f"分割失败：{exc}")
+            messagebox.showerror("分割错误", str(exc))
+
+    def _run_segment_polygon(self) -> None:
+        if self.source_bgr is None:
+            messagebox.showwarning("提示", "请先加载源图")
+            return
+        poly_mask = self._build_polygon_mask()
+        if poly_mask is None:
+            messagebox.showwarning("提示", "请至少添加 3 个折线点")
+            return
+        self.source_mask = poly_mask
+        if not self.polygon_closed:
+            self.polygon_closed = True
+            self.status.set("分割完成。模式=折线多边形（已自动闭合）")
+        else:
+            self.status.set("分割完成。模式=折线多边形")
+        self._draw_source()
+
+    def _run_segment_hybrid(self) -> None:
+        if self.source_bgr is None:
+            messagebox.showwarning("提示", "请先加载源图")
+            return
+        if not self.points:
+            messagebox.showwarning("提示", "混合模式需要前景/背景点，请先添加提示点")
+            return
+        fg_count = sum(1 for lb in self.labels if lb == 1)
+        if fg_count == 0:
+            messagebox.showwarning("提示", "混合模式至少需要一个前景点")
+            return
+        poly_mask = self._build_polygon_mask()
+        if poly_mask is None:
+            messagebox.showwarning("提示", "混合模式需要折线区域，请至少添加 3 个折线点")
+            return
+        try:
+            self.status.set(f"正在执行混合分割... 点数={len(self.points)}，前景点={fg_count}，折线点={len(self.polygon_points)}")
+            self.root.update_idletasks()
+            res = self.sam.predict(self.points, self.labels)
+            best = max(res, key=lambda x: x.score)
+            sam_mask = best.mask.astype(np.uint8)
+            merged = cv2.bitwise_and(sam_mask, poly_mask)
+            if int(np.count_nonzero(merged)) == 0:
+                self.source_mask = poly_mask
+                self.status.set(f"分割完成。score={best.score:.3f}（SAM∩折线为空，已回退为折线掩码）")
+            else:
+                self.source_mask = merged
+                self.status.set(f"分割完成。score={best.score:.3f}（SAM+折线约束）")
+            if not self.polygon_closed:
+                self.polygon_closed = True
+            self._draw_source()
+        except Exception as exc:
+            self.status.set(f"混合分割失败：{exc}")
             messagebox.showerror("分割错误", str(exc))
 
     def run_refine(self) -> None:
@@ -537,35 +657,117 @@ class AugApp:
             out_img = self.pctnet.harmonize(out_img, out_mask)
         return out_img, out_mask, out_bbox
 
+    def _source_canvas_to_image(self, event) -> tuple[int, int] | None:
+        if self.source_bgr is None:
+            return None
+        x = int((event.x - self.src_offset_x) / max(self.src_scale, 1e-6))
+        y = int((event.y - self.src_offset_y) / max(self.src_scale, 1e-6))
+        h, w = self.source_bgr.shape[:2]
+        if x < 0 or y < 0 or x >= w or y >= h:
+            return None
+        return x, y
+
+    def _build_polygon_mask(self) -> np.ndarray | None:
+        if self.source_bgr is None or len(self.polygon_points) < 3:
+            return None
+        h, w = self.source_bgr.shape[:2]
+        mask = np.zeros((h, w), dtype=np.uint8)
+        pts = np.array(self.polygon_points, dtype=np.int32)
+        cv2.fillPoly(mask, [pts], 1)
+        return mask
+
     def _add_prompt_point(self, event, label: int) -> None:
         if self.source_bgr is None:
             return
         if self._src_panning:
             self._src_panning = False
             return
-        x = int((event.x - self.src_offset_x) / max(self.src_scale, 1e-6))
-        y = int((event.y - self.src_offset_y) / max(self.src_scale, 1e-6))
-        h, w = self.source_bgr.shape[:2]
-        if x < 0 or y < 0 or x >= w or y >= h:
+        xy = self._source_canvas_to_image(event)
+        if xy is None:
             return
-
+        x, y = xy
         self.points.append((x, y))
         self.labels.append(label)
         fg_n = sum(1 for lb in self.labels if lb == 1)
         self.status.set(f"已添加点（{'背景' if label == 0 else '前景'}）：({x}, {y}) | 前景点={fg_n}，总点数={len(self.points)}")
         self._draw_source()
 
+    def _add_polygon_point(self, event) -> None:
+        if self.source_bgr is None:
+            return
+        if self._src_panning:
+            self._src_panning = False
+            return
+        xy = self._source_canvas_to_image(event)
+        if xy is None:
+            return
+        if self.polygon_closed:
+            self.polygon_closed = False
+        self.polygon_points.append(xy)
+        self.status.set(f"已添加折线点：({xy[0]}, {xy[1]})，总折线点={len(self.polygon_points)}")
+        self._draw_source()
+
+    def close_polygon(self) -> None:
+        if len(self.polygon_points) < 3:
+            self.status.set("折线点不足，至少需要 3 个点才能闭合")
+            return
+        self.polygon_closed = True
+        self.status.set(f"折线已闭合（点数={len(self.polygon_points)}）")
+        self._draw_source()
+
+    def undo_polygon_point(self) -> None:
+        if not self.polygon_points:
+            self.status.set("没有可撤销的折线点")
+            return
+        px, py = self.polygon_points.pop()
+        if len(self.polygon_points) < 3:
+            self.polygon_closed = False
+        self.status.set(f"已撤销折线点：({px}, {py})")
+        self._draw_source()
+
+    def clear_polygon(self) -> None:
+        self.polygon_points = []
+        self.polygon_closed = False
+        self.status.set("已清空折线")
+        self._draw_source()
+
+    def on_finish_polygon_shortcut(self, _event) -> None:
+        mode = self.segment_mode_var.get()
+        if mode in (self.MODE_POLYGON, self.MODE_HYBRID):
+            self.close_polygon()
+
     def on_source_click_fg(self, event) -> None:
+        mode = self.segment_mode_var.get()
+        if mode == self.MODE_POLYGON:
+            self._add_polygon_point(event)
+            return
         self._add_prompt_point(event, label=1)
 
     def on_source_click_bg(self, event) -> None:
+        mode = self.segment_mode_var.get()
+        if mode == self.MODE_POLYGON:
+            self._add_polygon_point(event)
+            return
         self._add_prompt_point(event, label=0)
 
+    def on_source_click_poly(self, event) -> None:
+        mode = self.segment_mode_var.get()
+        if mode in (self.MODE_POLYGON, self.MODE_HYBRID):
+            self._add_polygon_point(event)
+
     def on_source_right_click(self, event) -> None:
+        mode = self.segment_mode_var.get()
+        if (event.state & 0x0001) and mode in (self.MODE_POLYGON, self.MODE_HYBRID):
+            return
+        if mode == self.MODE_POLYGON:
+            self.undo_polygon_point()
+            return
         if not self.points:
             return
-        x = int((event.x - self.src_offset_x) / max(self.src_scale, 1e-6))
-        y = int((event.y - self.src_offset_y) / max(self.src_scale, 1e-6))
+        xy = self._source_canvas_to_image(event)
+        if xy is None:
+            return
+        x, y = xy
         # Remove nearest prompt point for quick correction.
         d2 = [((px - x) ** 2 + (py - y) ** 2) for (px, py) in self.points]
         idx = int(np.argmin(np.array(d2)))
@@ -573,6 +775,11 @@ class AugApp:
         lb = self.labels.pop(idx)
         self.status.set(f"已删除点（{'背景' if lb == 0 else '前景'}）：({px}, {py})")
         self._draw_source()
+
+    def on_source_right_click_poly(self, _event) -> None:
+        if self.segment_mode_var.get() in (self.MODE_POLYGON, self.MODE_HYBRID):
+            self.undo_polygon_point()
+            return "break"
 
     def undo_last_point(self) -> None:
         if not self.points:
