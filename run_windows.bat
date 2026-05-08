@@ -6,43 +6,32 @@ cd /d "%~dp0"
 echo PCB Defect Augmentation - Windows launcher
 echo.
 
-where py >nul 2>nul
-if %errorlevel%==0 (
-    set "PYTHON_CMD=py -3"
-) else (
-    where python >nul 2>nul
-    if %errorlevel%==0 (
-        set "PYTHON_CMD=python"
-    ) else (
-        echo Python was not found.
-        echo Install Python 3.10 or newer from https://www.python.org/downloads/windows/
-        echo During installation, enable "Add python.exe to PATH".
-        echo.
-        pause
-        exit /b 1
-    )
-)
+set "ENV_NAME=pcb311"
 
-if not exist ".venv\Scripts\python.exe" (
-    echo Creating virtual environment...
-    %PYTHON_CMD% -m venv .venv
-    if errorlevel 1 (
-        echo Failed to create the virtual environment.
-        echo.
-        pause
-        exit /b 1
-    )
-)
-
-call ".venv\Scripts\activate.bat"
+where conda >nul 2>nul
 if errorlevel 1 (
-    echo Failed to activate the virtual environment.
+    echo Conda was not found.
+    echo Install Anaconda or Miniconda, then reopen Command Prompt and run this file again.
+    echo Miniconda: https://docs.conda.io/en/latest/miniconda.html
     echo.
     pause
     exit /b 1
 )
 
-python -m pip install --upgrade pip
+conda run -n %ENV_NAME% python --version >nul 2>nul
+if errorlevel 1 (
+    echo Creating conda environment: %ENV_NAME%
+    conda create -y -n %ENV_NAME% python=3.11
+    if errorlevel 1 (
+        echo Failed to create conda environment %ENV_NAME%.
+        echo.
+        pause
+        exit /b 1
+    )
+)
+
+echo Using conda environment: %ENV_NAME%
+conda run -n %ENV_NAME% python -m pip install --upgrade pip
 if errorlevel 1 (
     echo Failed to upgrade pip.
     echo.
@@ -50,7 +39,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-python -m pip install -r requirements.txt
+conda run -n %ENV_NAME% python -m pip install -r requirements.txt
 if errorlevel 1 (
     echo Failed to install project dependencies.
     echo.
@@ -60,7 +49,7 @@ if errorlevel 1 (
 
 echo.
 echo Starting application...
-python app.py
+conda run -n %ENV_NAME% python app.py
 if errorlevel 1 (
     echo.
     echo Application exited with an error.

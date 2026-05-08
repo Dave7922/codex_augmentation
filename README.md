@@ -13,10 +13,36 @@
 
 ## 快速开始
 
+### Windows
+
+先安装 Anaconda 或 Miniconda，然后运行：
+
+```bat
+git clone https://github.com/Dave7922/codex_augmentation.git
+cd codex_augmentation
+run_windows.bat
+```
+
+`run_windows.bat` 会使用 Conda 环境 `pcb311`。如果本机还没有该环境，脚本会自动创建：
+
+```bat
+conda create -y -n pcb311 python=3.11
+```
+
+后续更新：
+
+```bat
+cd codex_augmentation
+git pull
+run_windows.bat
+```
+
+### macOS / Linux
+
 ```bash
 cd codex_augmentation
-python -m venv .venv
-source .venv/bin/activate
+conda create -y -n pcb311 python=3.11
+conda activate pcb311
 pip install -r requirements.txt
 python app.py
 ```
