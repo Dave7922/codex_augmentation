@@ -53,10 +53,22 @@ python app.py
 
 若要启用 SAM：
 
-1. 安装依赖（按你的 CUDA/CPU 环境安装 torch）
-2. 安装 `segment-anything`
-3. 下载 SAM checkpoint（例如 `sam_vit_h_4b8939.pth`）
-4. 启动后点击 `Load SAM Checkpoint`
+1. Windows 用户运行 `run_windows.bat`，脚本会在 `pcb311` 中安装 CPU 版 PyTorch 和 `segment-anything`
+2. 脚本会自动下载 SAM checkpoint 到 `checkpoints/sam_vit_b_01ec64.pth`
+3. 脚本会自动下载 PCT-Net 权重到 `third_party/PCT-Net-Image-Harmonization-main/pretrained_models/PCTNet_ViT.pth`
+4. 启动后会自动加载默认 SAM checkpoint；也可以点击 `Load SAM Checkpoint` 手动选择
+
+如果手动安装，请确保在 `pcb311` 环境内执行：
+
+```bash
+conda activate pcb311
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+python -m pip install git+https://github.com/facebookresearch/segment-anything.git
+mkdir checkpoints
+mkdir -p third_party/PCT-Net-Image-Harmonization-main/pretrained_models
+curl -L -o checkpoints/sam_vit_b_01ec64.pth https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
+curl -L -o third_party/PCT-Net-Image-Harmonization-main/pretrained_models/PCTNet_ViT.pth https://github.com/rakutentech/PCT-Net-Image-Harmonization/raw/main/pretrained_models/PCTNet_ViT.pth
+```
 
 ## 交互说明
 

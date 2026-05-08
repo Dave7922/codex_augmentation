@@ -7,6 +7,10 @@ echo PCB Defect Augmentation - Windows launcher
 echo.
 
 set "ENV_NAME=pcb311"
+set "SAM_CHECKPOINT=checkpoints\sam_vit_b_01ec64.pth"
+set "SAM_URL=https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+set "PCTNET_WEIGHTS=third_party\PCT-Net-Image-Harmonization-main\pretrained_models\PCTNet_ViT.pth"
+set "PCTNET_URL=https://github.com/rakutentech/PCT-Net-Image-Harmonization/raw/main/pretrained_models/PCTNet_ViT.pth"
 
 where conda >nul 2>nul
 if errorlevel 1 (
@@ -65,12 +69,57 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo Installing PyTorch CPU support for SAM...
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+if errorlevel 1 (
+    echo Failed to install PyTorch.
+    echo.
+    pause
+    exit /b 1
+)
+
 python -m pip install -r requirements.txt
 if errorlevel 1 (
     echo Failed to install project dependencies.
     echo.
     pause
     exit /b 1
+)
+
+if not exist "checkpoints" mkdir "checkpoints"
+if not exist "%SAM_CHECKPOINT%" (
+    echo Downloading SAM pretrained checkpoint...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri '%SAM_URL%' -OutFile '%SAM_CHECKPOINT%'"
+    if errorlevel 1 (
+        echo Failed to download SAM checkpoint.
+        echo Download it manually from:
+        echo %SAM_URL%
+        echo and save it as:
+        echo %SAM_CHECKPOINT%
+        echo.
+        pause
+        exit /b 1
+    )
+) else (
+    echo SAM checkpoint already exists: %SAM_CHECKPOINT%
+)
+
+if not exist "third_party\PCT-Net-Image-Harmonization-main\pretrained_models" mkdir "third_party\PCT-Net-Image-Harmonization-main\pretrained_models"
+if not exist "%PCTNET_WEIGHTS%" (
+    echo Downloading PCT-Net pretrained weights...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri '%PCTNET_URL%' -OutFile '%PCTNET_WEIGHTS%'"
+    if errorlevel 1 (
+        echo Failed to download PCT-Net weights.
+        echo Download it manually from:
+        echo %PCTNET_URL%
+        echo and save it as:
+        echo %PCTNET_WEIGHTS%
+        echo.
+        pause
+        exit /b 1
+    )
+) else (
+    echo PCT-Net weights already exist: %PCTNET_WEIGHTS%
 )
 
 echo.
