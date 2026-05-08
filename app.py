@@ -20,7 +20,7 @@ from core.sam_engine import SamEngine
 class AugApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
-        self.root.title("PCB Defect Augmentation - SAM + Advanced Blending")
+        self.root.title("PCB 缺陷增强 - SAM + 高级融合")
         self.root.geometry("1500x860")
 
         self.sam = SamEngine()
@@ -50,7 +50,7 @@ class AugApp:
         self.paste_center = None
         self.last_target_dir = None
 
-        self.class_name = StringVar(value="defect")
+        self.class_name = StringVar(value="缺陷")
         self.blend_mode = StringVar(value="poisson-mixed")
         self.scale_var = DoubleVar(value=1.0)
         self.rotation_var = DoubleVar(value=0.0)
@@ -61,7 +61,7 @@ class AugApp:
         self.batch_count_var = IntVar(value=20)
         self.src_zoom_var = DoubleVar(value=1.0)
         self.tgt_zoom_var = DoubleVar(value=1.0)
-        self.status = StringVar(value="Ready")
+        self.status = StringVar(value="就绪")
 
         self._build_ui()
         self._auto_load_default_sam()
@@ -69,7 +69,7 @@ class AugApp:
     @staticmethod
     def _image_filetypes():
         # macOS Tk can crash if a single filetype string contains semicolon-separated patterns.
-        return [("Image files", ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff"))]
+        return [("图像文件", ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff"))]
 
     def _build_ui(self) -> None:
         style = ttk.Style(self.root)
@@ -79,54 +79,54 @@ class AugApp:
         toolbar = ttk.Frame(self.root, padding=(10, 8))
         toolbar.pack(side=TOP, fill="x")
 
-        source_ops = ttk.LabelFrame(toolbar, text="1) Source & Mask", padding=(8, 6))
+        source_ops = ttk.LabelFrame(toolbar, text="1) 源图与掩码", padding=(8, 6))
         source_ops.pack(side=LEFT, padx=(0, 8))
-        Button(source_ops, text="Load Source", command=self.load_source).pack(side=LEFT, padx=3)
-        Button(source_ops, text="Load SAM Checkpoint", command=self.load_sam_checkpoint).pack(side=LEFT, padx=3)
-        Button(source_ops, text="Reset Source", command=self.reset_source_state).pack(side=LEFT, padx=3)
-        Button(source_ops, text="Segment", command=self.run_segment).pack(side=LEFT, padx=3)
-        Button(source_ops, text="Undo Point", command=self.undo_last_point).pack(side=LEFT, padx=3)
-        Button(source_ops, text="Clear Points", command=self.clear_points).pack(side=LEFT, padx=3)
-        Button(source_ops, text="Refine Mask", command=self.run_refine).pack(side=LEFT, padx=3)
-        Button(source_ops, text="Extract Patch", command=self.run_extract_patch).pack(side=LEFT, padx=3)
+        Button(source_ops, text="加载源图", command=self.load_source).pack(side=LEFT, padx=3)
+        Button(source_ops, text="加载 SAM 权重", command=self.load_sam_checkpoint).pack(side=LEFT, padx=3)
+        Button(source_ops, text="重置源图", command=self.reset_source_state).pack(side=LEFT, padx=3)
+        Button(source_ops, text="分割", command=self.run_segment).pack(side=LEFT, padx=3)
+        Button(source_ops, text="撤销点", command=self.undo_last_point).pack(side=LEFT, padx=3)
+        Button(source_ops, text="清空点", command=self.clear_points).pack(side=LEFT, padx=3)
+        Button(source_ops, text="精修掩码", command=self.run_refine).pack(side=LEFT, padx=3)
+        Button(source_ops, text="提取贴片", command=self.run_extract_patch).pack(side=LEFT, padx=3)
 
-        synth_ops = ttk.LabelFrame(toolbar, text="2) Synthesize & Export", padding=(8, 6))
+        synth_ops = ttk.LabelFrame(toolbar, text="2) 合成与导出", padding=(8, 6))
         synth_ops.pack(side=LEFT, padx=(0, 8))
-        Button(synth_ops, text="Load Target", command=self.load_target).pack(side=LEFT, padx=3)
-        Button(synth_ops, text="Synthesize", command=self.run_synthesize).pack(side=LEFT, padx=3)
-        Button(synth_ops, text="Batch Synthesize", command=self.run_batch_synthesize).pack(side=LEFT, padx=3)
-        Button(synth_ops, text="Reset Result", command=self.reset_result).pack(side=LEFT, padx=3)
-        Button(synth_ops, text="Export COCO", command=self.run_export).pack(side=LEFT, padx=3)
+        Button(synth_ops, text="加载目标图", command=self.load_target).pack(side=LEFT, padx=3)
+        Button(synth_ops, text="执行合成", command=self.run_synthesize).pack(side=LEFT, padx=3)
+        Button(synth_ops, text="批量合成", command=self.run_batch_synthesize).pack(side=LEFT, padx=3)
+        Button(synth_ops, text="重置结果", command=self.reset_result).pack(side=LEFT, padx=3)
+        Button(synth_ops, text="导出 COCO", command=self.run_export).pack(side=LEFT, padx=3)
 
-        settings = ttk.LabelFrame(self.root, text="Settings", padding=(10, 8))
+        settings = ttk.LabelFrame(self.root, text="参数设置", padding=(10, 8))
         settings.pack(side=TOP, fill="x", padx=10, pady=(0, 8))
 
-        ttk.Label(settings, text="Blend").pack(side=LEFT, padx=(0, 4))
+        ttk.Label(settings, text="融合").pack(side=LEFT, padx=(0, 4))
         ttk.Combobox(settings, textvariable=self.blend_mode, values=["alpha", "poisson-normal", "poisson-mixed"], width=16, state="readonly").pack(side=LEFT, padx=(0, 10))
-        ttk.Label(settings, text="Class").pack(side=LEFT, padx=(0, 4))
+        ttk.Label(settings, text="类别").pack(side=LEFT, padx=(0, 4))
         ttk.Entry(settings, textvariable=self.class_name, width=14).pack(side=LEFT, padx=(0, 14))
-        ttk.Label(settings, text="Scale").pack(side=LEFT, padx=(0, 4))
+        ttk.Label(settings, text="缩放").pack(side=LEFT, padx=(0, 4))
         ttk.Scale(settings, variable=self.scale_var, from_=0.4, to=2.5, orient="horizontal", length=120).pack(side=LEFT, padx=(0, 10))
-        ttk.Label(settings, text="Rotation").pack(side=LEFT, padx=(0, 4))
+        ttk.Label(settings, text="旋转").pack(side=LEFT, padx=(0, 4))
         ttk.Scale(settings, variable=self.rotation_var, from_=-180, to=180, orient="horizontal", length=140).pack(side=LEFT, padx=(0, 10))
-        ttk.Checkbutton(settings, text="Flip X", variable=self.flip_x_var).pack(side=LEFT, padx=3)
-        ttk.Checkbutton(settings, text="Flip Y", variable=self.flip_y_var).pack(side=LEFT, padx=3)
-        ttk.Checkbutton(settings, text="Color Match", variable=self.color_match_var).pack(side=LEFT, padx=(6, 8))
-        ttk.Label(settings, text="Harmonize").pack(side=LEFT, padx=(0, 4))
+        ttk.Checkbutton(settings, text="水平翻转", variable=self.flip_x_var).pack(side=LEFT, padx=3)
+        ttk.Checkbutton(settings, text="垂直翻转", variable=self.flip_y_var).pack(side=LEFT, padx=3)
+        ttk.Checkbutton(settings, text="颜色匹配", variable=self.color_match_var).pack(side=LEFT, padx=(6, 8))
+        ttk.Label(settings, text="和谐化").pack(side=LEFT, padx=(0, 4))
         ttk.Combobox(settings, textvariable=self.harmonize_var, values=["off", "pctnet"], width=8, state="readonly").pack(side=LEFT, padx=(0, 10))
-        ttk.Label(settings, text="Batch N").pack(side=LEFT, padx=(0, 4))
+        ttk.Label(settings, text="批量数量").pack(side=LEFT, padx=(0, 4))
         ttk.Spinbox(settings, from_=1, to=1000, textvariable=self.batch_count_var, width=6).pack(side=LEFT, padx=(0, 10))
-        ttk.Label(settings, text="Src Zoom").pack(side=LEFT, padx=(0, 4))
+        ttk.Label(settings, text="源图缩放").pack(side=LEFT, padx=(0, 4))
         ttk.Scale(settings, variable=self.src_zoom_var, from_=0.5, to=4.0, orient="horizontal", length=90, command=lambda _: self._draw_source()).pack(side=LEFT, padx=(0, 8))
-        ttk.Label(settings, text="Tgt Zoom").pack(side=LEFT, padx=(0, 4))
+        ttk.Label(settings, text="目标图缩放").pack(side=LEFT, padx=(0, 4))
         ttk.Scale(settings, variable=self.tgt_zoom_var, from_=0.5, to=4.0, orient="horizontal", length=90, command=lambda _: self._draw_target()).pack(side=LEFT, padx=(0, 2))
 
         middle = ttk.Frame(self.root)
         middle.pack(fill=BOTH, expand=True)
 
-        left_panel = ttk.LabelFrame(middle, text="Source View", padding=(6, 6))
+        left_panel = ttk.LabelFrame(middle, text="源图视图", padding=(6, 6))
         left_panel.pack(side=LEFT, fill=BOTH, expand=True, padx=8, pady=6)
-        Label(left_panel, text="Left-click=FG | Shift+Left-click=BG | Right-click=remove nearest | Ctrl+Drag=pan").pack(anchor="w", pady=(0, 4))
+        Label(left_panel, text="左键=前景点 | Shift+左键=背景点 | 右键=删除最近点 | Ctrl+拖拽=平移").pack(anchor="w", pady=(0, 4))
         self.source_canvas = Canvas(left_panel, bg="#202020", width=700, height=740)
         self.source_canvas.pack(fill=BOTH, expand=True)
         self.source_canvas.bind("<Button-1>", self.on_source_click_fg)
@@ -136,9 +136,9 @@ class AugApp:
         self.source_canvas.bind("<Control-B1-Motion>", self.on_source_pan_move)
         self.source_canvas.bind("<Control-ButtonRelease-1>", self.on_source_pan_end)
 
-        right_panel = ttk.LabelFrame(middle, text="Target / Result View", padding=(6, 6))
+        right_panel = ttk.LabelFrame(middle, text="目标图 / 结果图视图", padding=(6, 6))
         right_panel.pack(side=RIGHT, fill=BOTH, expand=True, padx=8, pady=6)
-        Label(right_panel, text="Left-click=set paste center | Ctrl+Drag=pan").pack(anchor="w", pady=(0, 4))
+        Label(right_panel, text="左键=设置粘贴中心 | Ctrl+拖拽=平移").pack(anchor="w", pady=(0, 4))
         self.target_canvas = Canvas(right_panel, bg="#202020", width=700, height=740)
         self.target_canvas.pack(fill=BOTH, expand=True)
         self.target_canvas.bind("<Button-1>", self.on_target_click)
@@ -159,9 +159,9 @@ class AugApp:
             if ckpt.exists():
                 try:
                     self.sam.load_checkpoint(str(ckpt), model_type="vit_b")
-                    self.status.set(f"Auto-loaded SAM: {ckpt}")
+                    self.status.set(f"已自动加载 SAM 权重：{ckpt}")
                 except Exception as exc:
-                    self.status.set(f"SAM auto-load failed: {exc}")
+                    self.status.set(f"SAM 自动加载失败：{exc}")
                 return
 
     @staticmethod
@@ -237,7 +237,7 @@ class AugApp:
             return
         img = cv2.imread(path)
         if img is None:
-            messagebox.showerror("Error", "Failed to read source image")
+            messagebox.showerror("错误", "读取源图失败")
             return
 
         self.source_bgr = img
@@ -246,12 +246,12 @@ class AugApp:
         self.points, self.labels = [], []
         self.src_offset_x = 0
         self.src_offset_y = 0
-        self.status.set(f"Loaded source: {Path(path).name}")
+        self.status.set(f"已加载源图：{Path(path).name}")
         self._draw_source()
 
     def reset_source_state(self) -> None:
         if self.source_bgr is None:
-            self.status.set("No source image loaded")
+            self.status.set("尚未加载源图")
             return
         self.source_mask = None
         self.points = []
@@ -260,11 +260,11 @@ class AugApp:
         self.patch_mask = None
         self.src_offset_x = 0
         self.src_offset_y = 0
-        self.status.set("Source reset: cleared prompts, mask, and extracted patch")
+        self.status.set("源图已重置：提示点、掩码和贴片已清空")
         self._draw_source()
 
     def load_sam_checkpoint(self) -> None:
-        path = filedialog.askopenfilename(filetypes=[("SAM checkpoint", "*.pth")])
+        path = filedialog.askopenfilename(filetypes=[("SAM 权重文件", "*.pth")])
         if not path:
             return
         try:
@@ -277,50 +277,50 @@ class AugApp:
             self.sam.load_checkpoint(path, model_type=model_type)
             if self.source_bgr is not None:
                 self.sam.set_image(self.source_bgr)
-            self.status.set(f"SAM checkpoint loaded ({model_type})")
+            self.status.set(f"SAM 权重已加载（{model_type}）")
         except Exception as exc:
-            messagebox.showerror("SAM error", str(exc))
+            messagebox.showerror("SAM 错误", str(exc))
 
     def run_segment(self) -> None:
         if self.source_bgr is None:
-            messagebox.showwarning("Warning", "Load source image first")
+            messagebox.showwarning("提示", "请先加载源图")
             return
         if not self.points:
-            messagebox.showwarning("Warning", "Please click at least one foreground point")
+            messagebox.showwarning("提示", "请至少点击一个前景点")
             return
         fg_count = sum(1 for lb in self.labels if lb == 1)
         if fg_count == 0:
-            messagebox.showwarning("Warning", "Need at least one foreground point (normal left-click)")
+            messagebox.showwarning("提示", "至少需要一个前景点（普通左键点击）")
             return
         try:
-            self.status.set(f"Running segmentation... points={len(self.points)}, fg={fg_count}")
+            self.status.set(f"正在执行分割... 点数={len(self.points)}，前景点={fg_count}")
             self.root.update_idletasks()
             res = self.sam.predict(self.points, self.labels)
             best = max(res, key=lambda x: x.score)
             self.source_mask = best.mask.astype(np.uint8)
-            self.status.set(f"Segmentation done. score={best.score:.3f} ({'SAM' if self.sam.sam_loaded else 'fallback'})")
+            self.status.set(f"分割完成。score={best.score:.3f}（{'SAM' if self.sam.sam_loaded else '回退'}）")
             self._draw_source()
         except Exception as exc:
-            self.status.set(f"Segmentation failed: {exc}")
-            messagebox.showerror("Segmentation error", str(exc))
+            self.status.set(f"分割失败：{exc}")
+            messagebox.showerror("分割错误", str(exc))
 
     def run_refine(self) -> None:
         if self.source_mask is None:
-            messagebox.showwarning("Warning", "Please segment first")
+            messagebox.showwarning("提示", "请先执行分割")
             return
         self.source_mask = refine_mask(self.source_mask)
-        self.status.set("Mask refined with contour + morphology")
+        self.status.set("掩码精修完成（轮廓 + 形态学）")
         self._draw_source()
 
     def run_extract_patch(self) -> None:
         if self.source_bgr is None or self.source_mask is None:
-            messagebox.showwarning("Warning", "Need source and mask")
+            messagebox.showwarning("提示", "需要先有源图和掩码")
             return
         try:
             self.patch_bgr, self.patch_mask, _ = extract_patch(self.source_bgr, self.source_mask)
-            self.status.set("Patch extracted")
+            self.status.set("贴片提取完成")
         except Exception as exc:
-            messagebox.showerror("Patch error", str(exc))
+            messagebox.showerror("贴片错误", str(exc))
 
     def load_target(self) -> None:
         path = filedialog.askopenfilename(filetypes=self._image_filetypes())
@@ -328,7 +328,7 @@ class AugApp:
             return
         img = cv2.imread(path)
         if img is None:
-            messagebox.showerror("Error", "Failed to read target image")
+            messagebox.showerror("错误", "读取目标图失败")
             return
         self.target_bgr = img
         self.last_target_dir = str(Path(path).parent)
@@ -338,18 +338,18 @@ class AugApp:
         self.tgt_offset_y = 0
         self.all_masks = []
         self.all_bboxes = []
-        self.status.set(f"Loaded target: {Path(path).name}")
+        self.status.set(f"已加载目标图：{Path(path).name}")
         self._draw_target()
 
     def run_synthesize(self) -> None:
         if self.target_bgr is None:
-            messagebox.showwarning("Warning", "Load target first")
+            messagebox.showwarning("提示", "请先加载目标图")
             return
         if self.patch_bgr is None or self.patch_mask is None:
-            messagebox.showwarning("Warning", "Extract patch first")
+            messagebox.showwarning("提示", "请先提取贴片")
             return
         if self.paste_center is None:
-            messagebox.showwarning("Warning", "Click target to set paste center")
+            messagebox.showwarning("提示", "请在目标图上点击设置粘贴中心")
             return
 
         try:
@@ -380,25 +380,25 @@ class AugApp:
             if self.harmonize_var.get() == "pctnet":
                 self.result_bgr = self.pctnet.harmonize(self.result_bgr, self.placed_mask)
                 if self.pctnet._init_error is not None:
-                    self.status.set(f"Synthesis done: {real_mode} | pctnet fallback ({self.pctnet._init_error})")
+                    self.status.set(f"合成完成：{real_mode} | pctnet 回退（{self.pctnet._init_error}）")
                     self._draw_target()
                     return
             self.all_masks.append(self.placed_mask.copy())
             self.all_bboxes.append(self.last_bbox)
-            self.status.set(f"Synthesis done: {real_mode}")
+            self.status.set(f"合成完成：{real_mode}")
             self._draw_target()
         except Exception as exc:
-            messagebox.showerror("Synthesis error", str(exc))
+            messagebox.showerror("合成错误", str(exc))
 
     def run_export(self) -> None:
         if self.result_bgr is None or self.placed_mask is None or self.last_bbox is None:
-            messagebox.showwarning("Warning", "Synthesize before export")
+            messagebox.showwarning("提示", "请先合成再导出")
             return
 
         initial_dir = self.last_target_dir if self.last_target_dir else os.getcwd()
         out_dir = filedialog.askdirectory(
             initialdir=initial_dir,
-            title="Select export directory (defaults to target image folder)",
+            title="选择导出目录（默认使用目标图所在目录）",
         )
         if not out_dir:
             return
@@ -406,14 +406,14 @@ class AugApp:
         file_stem = f"synth_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         record = ExportRecord(
             image=self.result_bgr,
-            class_name=self.class_name.get().strip() or "defect",
+            class_name=self.class_name.get().strip() or "缺陷",
             file_stem=file_stem,
             masks=self.all_masks if self.all_masks else [self.placed_mask],
             bboxes=self.all_bboxes if self.all_bboxes else [self.last_bbox],
         )
         ann_path = export_coco(out_dir, record)
-        self.status.set(f"Exported: {ann_path}")
-        messagebox.showinfo("Export done", f"Saved to:\n{out_dir}")
+        self.status.set(f"导出完成：{ann_path}")
+        messagebox.showinfo("导出完成", f"已保存到：\n{out_dir}")
 
     def reset_result(self) -> None:
         self.result_bgr = None
@@ -421,18 +421,18 @@ class AugApp:
         self.last_bbox = None
         self.all_masks = []
         self.all_bboxes = []
-        self.status.set("Result reset; synth will start from original target")
+        self.status.set("结果已重置；下次合成将从原始目标图开始")
         self._draw_target()
 
     def run_batch_synthesize(self) -> None:
         if self.patch_bgr is None or self.patch_mask is None:
-            messagebox.showwarning("Warning", "Extract patch first")
+            messagebox.showwarning("提示", "请先提取贴片")
             return
 
-        src_dir = filedialog.askdirectory(title="Select target image directory")
+        src_dir = filedialog.askdirectory(title="选择目标图目录")
         if not src_dir:
             return
-        out_dir = filedialog.askdirectory(title="Select output directory")
+        out_dir = filedialog.askdirectory(title="选择输出目录")
         if not out_dir:
             return
 
@@ -440,7 +440,7 @@ class AugApp:
             p for p in Path(src_dir).iterdir() if p.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
         )
         if not img_paths:
-            messagebox.showwarning("Warning", "No target images found in directory")
+            messagebox.showwarning("提示", "目录中未找到目标图")
             return
 
         total = int(max(1, self.batch_count_var.get()))
@@ -457,7 +457,7 @@ class AugApp:
             stem = f"{t_path.stem}_synth_{i:04d}"
             record = ExportRecord(
                 image=synth,
-                class_name=self.class_name.get().strip() or "defect",
+                class_name=self.class_name.get().strip() or "缺陷",
                 file_stem=stem,
                 masks=[msk],
                 bboxes=[bbox],
@@ -465,8 +465,8 @@ class AugApp:
             export_coco(out_dir, record)
             done += 1
 
-        self.status.set(f"Batch done: {done}/{total} exported to {out_dir}")
-        messagebox.showinfo("Batch done", f"Exported {done}/{total} samples")
+        self.status.set(f"批量完成：{done}/{total}，已导出到 {out_dir}")
+        messagebox.showinfo("批量完成", f"已导出 {done}/{total} 个样本")
 
     def _apply_color_match_if_needed(
         self,
@@ -552,7 +552,7 @@ class AugApp:
         self.points.append((x, y))
         self.labels.append(label)
         fg_n = sum(1 for lb in self.labels if lb == 1)
-        self.status.set(f"Point added ({'BG' if label == 0 else 'FG'}): ({x}, {y}) | FG={fg_n}, Total={len(self.points)}")
+        self.status.set(f"已添加点（{'背景' if label == 0 else '前景'}）：({x}, {y}) | 前景点={fg_n}，总点数={len(self.points)}")
         self._draw_source()
 
     def on_source_click_fg(self, event) -> None:
@@ -571,22 +571,22 @@ class AugApp:
         idx = int(np.argmin(np.array(d2)))
         px, py = self.points.pop(idx)
         lb = self.labels.pop(idx)
-        self.status.set(f"Point removed ({'BG' if lb == 0 else 'FG'}): ({px}, {py})")
+        self.status.set(f"已删除点（{'背景' if lb == 0 else '前景'}）：({px}, {py})")
         self._draw_source()
 
     def undo_last_point(self) -> None:
         if not self.points:
-            self.status.set("No prompt points to undo")
+            self.status.set("没有可撤销的提示点")
             return
         px, py = self.points.pop()
         lb = self.labels.pop()
-        self.status.set(f"Undo last point ({'BG' if lb == 0 else 'FG'}): ({px}, {py})")
+        self.status.set(f"已撤销最后一个点（{'背景' if lb == 0 else '前景'}）：({px}, {py})")
         self._draw_source()
 
     def clear_points(self) -> None:
         self.points = []
         self.labels = []
-        self.status.set("Cleared all prompt points")
+        self.status.set("已清空所有提示点")
         self._draw_source()
 
     def on_target_click(self, event) -> None:
@@ -602,7 +602,7 @@ class AugApp:
         if x < 0 or y < 0 or x >= w or y >= h:
             return
         self.paste_center = (x, y)
-        self.status.set(f"Paste center set: ({x}, {y})")
+        self.status.set(f"已设置粘贴中心：({x}, {y})")
         self._draw_target()
 
     def on_source_pan_start(self, event) -> None:
